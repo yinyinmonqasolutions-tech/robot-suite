@@ -11,6 +11,9 @@ on:
     - cron: '0 21 * * *'
   # ────────────────────────────────────────────────────────────────────────
 
+# ── ADD THIS EXACT LINE TO SHOW THE TIMEOUT BANNER & MANUAL BUTTON ──
+  workflow_dispatch:
+
 jobs:
   test-automation:
     runs-on: ubuntu-latest
