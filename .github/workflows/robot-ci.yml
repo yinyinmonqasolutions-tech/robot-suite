@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, master ]
 
+  # ── ADDED SCHEDULE TO TRIGGER AUTOMATICALLY AT 4:00 AM ICT (21:00 UTC) ──
+  schedule:
+    - cron: '0 21 * * *'
+  # ────────────────────────────────────────────────────────────────────────
+
 jobs:
   test-automation:
     runs-on: ubuntu-latest
