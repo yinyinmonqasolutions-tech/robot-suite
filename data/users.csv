@@ -1,0 +1,3 @@
+*** Test Cases ***,${username},${password},${expected_result}
+Valid Standard User,standard_user,secret_sauce,Products
+Problem User,problem_user,secret_sauce,Products

@@ -1,0 +1,135 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# GitLab CI/CD — Robot Framework Suite
+# Runs on push to main/develop and nightly at 06:00 UTC (13:00 Bangkok)
+# ─────────────────────────────────────────────────────────────────────────────
+
+image: python:3.12-slim
+
+stages:
+  - install
+  - test
+  - report
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  ROBOT_REPORTS_DIR: "reports"
+  # Override credentials via GitLab CI/CD Variables (Settings → CI/CD → Variables)
+  SAUCEDEMO_USER: "${SAUCEDEMO_USER}"
+  SAUCEDEMO_PASS: "${SAUCEDEMO_PASS}"
+
+cache:
+  key: "${CI_COMMIT_REF_SLUG}-pip"
+  paths:
+    - .cache/pip/
+    - venv/
+
+# ── Install Stage ─────────────────────────────────────────────────────────────
+install-dependencies:
+  stage: install
+  script:
+    - apt-get update -qq && apt-get install -y -qq
+        chromium chromium-driver
+        fonts-liberation libappindicator3-1 libasound2 libatk-bridge2.0-0
+        libatk1.0-0 libcups2 libdbus-1-3 libdrm2 libgbm1 libnspr4
+        libnss3 libxcomposite1 libxdamage1 libxrandr2 xdg-utils wget
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip -q
+    - pip install -r requirements.txt -q
+    - python -c "import robot; print('Robot Framework', robot.version.VERSION)"
+  artifacts:
+    paths:
+      - venv/
+    expire_in: 1 hour
+
+# ── Auth Tests ────────────────────────────────────────────────────────────────
+test-auth:
+  stage: test
+  needs: [install-dependencies]
+  script:
+    - source venv/bin/activate
+    - mkdir -p ${ROBOT_REPORTS_DIR}/auth
+    - robot
+        --variable VALID_USER:${SAUCEDEMO_USER}
+        --variable VALID_PASS:${SAUCEDEMO_PASS}
+        --variable HEADLESS:True
+        --outputdir ${ROBOT_REPORTS_DIR}/auth
+        --output output.xml
+        --log log.html
+        --report report.html
+        tests/auth/
+  artifacts:
+    when: always
+    paths:
+      - reports/auth/
+    expire_in: 7 days
+  allow_failure: false
+
+# ── Shop Tests ────────────────────────────────────────────────────────────────
+test-shop:
+  stage: test
+  needs: [install-dependencies]
+  script:
+    - source venv/bin/activate
+    - mkdir -p ${ROBOT_REPORTS_DIR}/shop
+    - robot
+        --variable VALID_USER:${SAUCEDEMO_USER}
+        --variable VALID_PASS:${SAUCEDEMO_PASS}
+        --variable HEADLESS:True
+        --outputdir ${ROBOT_REPORTS_DIR}/shop
+        --output output.xml
+        --log log.html
+        --report report.html
+        tests/shop/
+  artifacts:
+    when: always
+    paths:
+      - reports/shop/
+    expire_in: 7 days
+  allow_failure: false
+
+# ── API Tests ─────────────────────────────────────────────────────────────────
+test-api:
+  stage: test
+  needs: [install-dependencies]
+  script:
+    - source venv/bin/activate
+    - mkdir -p ${ROBOT_REPORTS_DIR}/api
+    - robot
+        --outputdir ${ROBOT_REPORTS_DIR}/api
+        --output output.xml
+        --log log.html
+        --report report.html
+        tests/api/
+  artifacts:
+    when: always
+    paths:
+      - reports/api/
+    expire_in: 7 days
+  allow_failure: false
+
+# ── Merge Reports ─────────────────────────────────────────────────────────────
+merge-reports:
+  stage: report
+  needs: [test-auth, test-shop, test-api]
+  when: always
+  script:
+    - source venv/bin/activate
+    - rebot
+        --outputdir reports/merged
+        --output output.xml
+        --log log.html
+        --report report.html
+        --name "Robot Framework Suite"
+        reports/auth/output.xml
+        reports/shop/output.xml
+        reports/api/output.xml
+  artifacts:
+    when: always
+    paths:
+      - reports/merged/
+    expire_in: 30 days
+
+# ── Nightly Scheduled Run ─────────────────────────────────────────────────────
+# Schedule: Settings → CI/CD → Schedules → "0 6 * * *" on main branch
+# (06:00 UTC = 13:00 Bangkok ICT)
